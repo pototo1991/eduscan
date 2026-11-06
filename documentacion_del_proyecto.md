@@ -117,7 +117,7 @@ El sistema se estructura en dos entornos desacoplados para aprovechar los recurs
  │  └───────────────────┬────────────────────┘  │
  └──────────────────────┼───────────────────────┘
                         │ Conexión Red Local / LAN
-                        │ Puerto 5432 (PostgreSQL)
+                        │ Puerto 5433 (PostgreSQL en knossos)
                         ▼
  ┌──────────────────────────────────────────────┐
  │        MINI SERVIDOR «KNOSSOS»               │
@@ -152,7 +152,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Debe definirse contraseña segura}
     ports:
       # Exposición en la red local (o bind a IP específica de knossos)
-      - "5432:5432"
+      - "${DB_PORT:-5433}:5432"
     volumes:
       - eduscan_pgdata:/var/lib/postgresql/data
     networks:
@@ -200,7 +200,7 @@ services:
 ```dotenv
 # Conexión a Base de Datos en servidor Knossos
 DB_HOST=knossos.local        # O IP estática de knossos en tu red local (ej: 192.168.1.xxx)
-DB_PORT=5432
+DB_PORT=5433
 DB_NAME=eduscan_db
 DB_USER=eduscan_user
 DB_PASSWORD=tu_contrasena_segura
