@@ -1,53 +1,115 @@
-import sys
-from pathlib import Path
+"""
+Módulo de Ingesta y Carga Masiva a PostgreSQL (Etapa 'Load' del ETL)
+====================================================================
 
+Este módulo orquesta la conexión a la base de datos PostgreSQL alojada en el mini
+servidor 'knossos' (o entorno local), ejecuta la verificación de tablas e índices,
+y realiza la inserción masiva y actualización transaccional (UPSERT) de:
+1. Catálogo maestro de establecimientos escolares (`establecimiento`).
+2. Evaluaciones y puntajes históricos (`evaluacion_simce`).
+3. Promedios comunales oficiales (`promedio_comunal_simce`).
+4. Promedios regionales oficiales (`promedio_regional_simce`).
+
+Propiedades Clave:
+------------------
+- Idempotencia (UPSERT):
+  Utiliza sentencias SQL con `ON CONFLICT (...) DO UPDATE` para garantizar que la
+  ejecución repetida del script nunca genere registros duplicados y siempre mantenga
+  los datos actualizados con la información más reciente.
+- Sanitización de Tipos:
+  Convierte valores `NaN` de float en `None` (SQL NULL) y asegura conversión estricta
+  a enteros de las columnas numéricas para evitar errores de deserialización en psycopg2.
+- Transaccionalidad:
+  Utiliza context managers de SQLAlchemy (`engine.begin()`) que garantizan commit
+  automático en caso de éxito o rollback inmediato si ocurre cualquier fallo.
+"""
+
+import sys
+import math
+from pathlib import Path
+from typing import List, Dict, Any, Optional
+
+# Garantizar que la raíz del proyecto esté en sys.path al ejecutarse directamente
 BASE_DIR = Path(__file__).resolve().parent.parent
 if str(BASE_DIR) not in sys.path:
     sys.path.insert(0, str(BASE_DIR))
 
 import pandas as pd
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, text, Engine
 from etl.config import get_database_url
 from etl.normalizador import parse_rbd_file, parse_comuna_file, parse_region_file
 
 STAGING_DIR = BASE_DIR / "data" / "staging" / "simce"
 INIT_SQL_PATH = BASE_DIR / "deploy" / "knossos" / "init_db.sql"
 
-def init_schema(engine):
-    """Ejecuta el script SQL inicial si las tablas no existen."""
+def init_schema(engine: Engine) -> None:
+    """
+    Verifica e inicializa el esquema relacional en la base de datos.
+
+    Lee el archivo `deploy/knossos/init_db.sql` y ejecuta secuencialmente las
+    sentencias DDL (tablas, extensiones e índices) si aún no existen.
+
+    Args:
+        engine (Engine): Instancia del motor SQLAlchemy conectado a PostgreSQL.
+    """
     print("Verificando esquema relacional en la base de datos...")
     if not INIT_SQL_PATH.exists():
-        print(f"[!] No se encontró el archivo {INIT_SQL_PATH}")
+        print(f"[!] No se encontró el archivo de esquema {INIT_SQL_PATH}")
         return
         
     with open(INIT_SQL_PATH, "r", encoding="utf-8") as f:
         sql_content = f.read()
         
     with engine.begin() as conn:
-        # Ejecutar sentencia por sentencia separadas por ;
         for statement in sql_content.split(";"):
             stmt = statement.strip()
             if stmt:
                 conn.execute(text(stmt))
     print("[OK] Tablas e índices inicializados correctamente.")
 
-import math
+def clean_records(records: List[Dict[str, Any]], int_keys: Optional[List[str]] = None) -> List[Dict[str, Any]]:
+    """
+    Sanitiza una lista de diccionarios antes de enviarla a PostgreSQL.
 
-def clean_records(records, int_keys=None):
-    """Reemplaza NaN de float por None y asegura tipos enteros correctos."""
-    int_keys = set(int_keys or [])
+    Resuelve dos problemas críticos de compatibilidad entre Pandas y psycopg2:
+    1. Reemplaza cualquier `float('nan')` por `None`, permitiendo que PostgreSQL
+       lo interprete como `NULL`.
+    2. Asegura que las columnas enteras especificadas en `int_keys` sean del tipo
+       `int` nativo de Python o `None`, previniendo errores de 'integer out of range'.
+
+    Args:
+        records (List[Dict[str, Any]]): Lista de filas generadas por DataFrame.to_dict().
+        int_keys (Optional[List[str]]): Lista de nombres de columnas que deben ser enteras.
+
+    Returns:
+        List[Dict[str, Any]]: Lista de diccionarios sanitizada y lista para psycopg2.
+    """
+    int_keys_set = set(int_keys or [])
     for r in records:
         for k, v in r.items():
             if v is not None and isinstance(v, float) and math.isnan(v):
                 r[k] = None
-            elif k in int_keys and v is not None:
+            elif k in int_keys_set and v is not None:
                 try:
                     r[k] = int(v)
                 except (ValueError, TypeError):
                     r[k] = None
     return records
 
-def upsert_establecimientos(engine, df_est: pd.DataFrame):
+def upsert_establecimientos(engine: Engine, df_est: pd.DataFrame) -> int:
+    """
+    Inserta o actualiza colegios en la tabla `establecimiento`.
+
+    Si el colegio ya existe (identificado unívocamente por su clave primaria `rbd`),
+    actualiza su nombre, comuna, dependencia y fecha de última modificación.
+
+    Args:
+        engine (Engine): Motor SQLAlchemy.
+        df_est (pd.DataFrame): DataFrame con la información de los establecimientos.
+
+    Returns:
+        int: Número de registros procesados.
+    """
     if df_est.empty:
         return 0
     raw_records = df_est.to_dict(orient="records")
@@ -78,7 +140,21 @@ def upsert_establecimientos(engine, df_est: pd.DataFrame):
         conn.execute(sql, records)
     return len(records)
 
-def upsert_evaluaciones(engine, df_eval: pd.DataFrame):
+def upsert_evaluaciones(engine: Engine, df_eval: pd.DataFrame) -> int:
+    """
+    Inserta o actualiza evaluaciones en la tabla `evaluacion_simce`.
+
+    La restricción única `(rbd, anio, grado)` previene duplicados. Si ya existe
+    la evaluación de un grado para un colegio en ese año, actualiza los puntajes
+    y estándares de aprendizaje con la versión más reciente.
+
+    Args:
+        engine (Engine): Motor SQLAlchemy.
+        df_eval (pd.DataFrame): DataFrame con puntajes y porcentajes EDA.
+
+    Returns:
+        int: Número de evaluaciones procesadas.
+    """
     if df_eval.empty:
         return 0
     raw_records = df_eval.to_dict(orient="records")
@@ -114,7 +190,19 @@ def upsert_evaluaciones(engine, df_eval: pd.DataFrame):
         conn.execute(sql, records)
     return len(records)
 
-def upsert_comunales(engine, df_com: pd.DataFrame):
+def upsert_comunales(engine: Engine, df_com: pd.DataFrame) -> int:
+    """
+    Inserta o actualiza benchmarks comunales en la tabla `promedio_comunal_simce`.
+
+    Clave única: `(cod_comuna, anio, grado)`.
+
+    Args:
+        engine (Engine): Motor SQLAlchemy.
+        df_com (pd.DataFrame): DataFrame con promedios comunales.
+
+    Returns:
+        int: Número de promedios comunales procesados.
+    """
     if df_com.empty:
         return 0
     raw_records = df_com.to_dict(orient="records")
@@ -137,7 +225,19 @@ def upsert_comunales(engine, df_com: pd.DataFrame):
         conn.execute(sql, records)
     return len(records)
 
-def upsert_regionales(engine, df_reg: pd.DataFrame):
+def upsert_regionales(engine: Engine, df_reg: pd.DataFrame) -> int:
+    """
+    Inserta o actualiza benchmarks regionales en la tabla `promedio_regional_simce`.
+
+    Clave única: `(cod_region, anio, grado)`.
+
+    Args:
+        engine (Engine): Motor SQLAlchemy.
+        df_reg (pd.DataFrame): DataFrame con promedios regionales.
+
+    Returns:
+        int: Número de promedios regionales procesados.
+    """
     if df_reg.empty:
         return 0
     raw_records = df_reg.to_dict(orient="records")
@@ -160,13 +260,22 @@ def upsert_regionales(engine, df_reg: pd.DataFrame):
         conn.execute(sql, records)
     return len(records)
 
-def run_pipeline(years=[2023, 2024, 2025]):
+def run_pipeline(years: List[int] = [2023, 2024, 2025]) -> None:
+    """
+    Función orquestadora principal de la etapa de carga.
+
+    Itera sobre los años especificados, lee los archivos en staging y ejecuta
+    la persistencia ordenada (primero colegios, luego evaluaciones y promedios)
+    hacia la base de datos PostgreSQL.
+
+    Args:
+        years (List[int]): Lista de años a procesar (ej: [2023, 2024, 2025]).
+    """
     db_url = get_database_url()
     print(f"Conectando a la base de datos...")
     
     try:
         engine = create_engine(db_url)
-        # Probar conexión
         with engine.connect() as conn:
             conn.execute(text("SELECT 1;"))
         print("[OK] Conexión establecida con éxito.")
@@ -195,13 +304,13 @@ def run_pipeline(years=[2023, 2024, 2025]):
         print(f"  Procesando e ingestando Año {year}")
         print(f"==========================================")
 
-        # 1. Archivos RBD (Establecimientos y Notas)
+        # 1. Archivos RBD (Establecimientos y Evaluaciones)
         rbd_files = list(year_path.glob("**/*rbd*.csv"))
         for f in rbd_files:
             print(f"-> Parseando RBD: {f.name}...")
             df_est, df_eval = parse_rbd_file(f)
             
-            # Cargar primero establecimientos para respetar la FK
+            # Cargar primero colegios para satisfacer la clave foránea (FK)
             n_est = upsert_establecimientos(engine, df_est)
             n_eval = upsert_evaluaciones(engine, df_eval)
             total_est += n_est

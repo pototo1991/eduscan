@@ -1,3 +1,29 @@
+"""
+Módulo Extractor de Archivos Comprimidos del SIMCE (Etapa 'Extract' del ETL)
+=============================================================================
+
+Este script se encarga de la extracción automatizada y recursiva de los paquetes
+de datos publicados por la Agencia de Calidad de la Educación de Chile.
+
+Particularidad de los archivos oficiales:
+------------------------------------------
+1. Los archivos anuales vienen en formato .rar (ej: 'Simce+2024.rar').
+2. Dentro de cada año existen sub-archivos .rar específicos por cada grado escolar
+   evaluado (ej: 'Simce 4to basico 2024.rar', 'Simce 2do medio 2024.rar').
+3. Dentro de cada grado se encuentran los archivos .csv planos finales:
+   - *_rbd_final.csv      -> Resultados a nivel de colegio (RBD)
+   - *_comuna_final.csv   -> Promedios comunales oficiales
+   - *_region_final.csv   -> Promedios regionales oficiales
+   - *_GLOSAS_*.xlsx      -> Diccionario de variables oficial
+
+Compatibilidad multiplataforma (Linux / WSL / Windows):
+-------------------------------------------------------
+Detecta herramientas de descompresión nativas de Linux (`7z`, `7za`, `unrar`) y,
+en caso de ejecutarse dentro de WSL 2, es capaz de invocar de forma transparente
+la instalación de `7z.exe` o `WinRAR` ubicada en el sistema anfitrión Windows
+convirtiendo las rutas de archivo con `wslpath`.
+"""
+
 import os
 import shutil
 import subprocess
@@ -9,14 +35,23 @@ RAW_DIR = BASE_DIR / "data" / "raw" / "simce"
 STAGING_DIR = BASE_DIR / "data" / "staging" / "simce"
 
 def find_7z_binary() -> Optional[str]:
-    """Detecta el ejecutable de 7-Zip o unrar disponible."""
-    # 1. PATH nativo
+    """
+    Localiza el binario ejecutable disponible para descomprimir archivos .rar.
+
+    Búsqueda secuencial:
+    1. PATH nativo de Linux (`7z`, `7za`, `unrar`).
+    2. Rutas estándar en Windows montadas bajo WSL (/mnt/c/Program Files/...).
+
+    Returns:
+        Optional[str]: Ruta absoluta hacia el ejecutable encontrado, o None si no existe.
+    """
+    # 1. Búsqueda en PATH del entorno actual
     for binary in ["7z", "7za", "unrar"]:
         path = shutil.which(binary)
         if path:
             return path
             
-    # 2. WSL con 7-Zip instalado en Windows
+    # 2. Búsqueda en Windows (entornos WSL 2)
     windows_paths = [
         "/mnt/c/Program Files/7-Zip/7z.exe",
         "/mnt/c/Program Files (x86)/7-Zip/7z.exe",
@@ -29,10 +64,21 @@ def find_7z_binary() -> Optional[str]:
     return None
 
 def run_extraction(archive_path: Path, dest_dir: Path, tool_bin: str) -> bool:
-    """Extrae un archivo comprimido hacia el directorio destino."""
+    """
+    Ejecuta el comando de descompresión de un archivo individual hacia un directorio destino.
+
+    Si se utiliza un binario de Windows (.exe) desde WSL, se traduce la ruta de archivo
+    a formato Windows (UNC o letra de unidad con backslashes) mediante `wslpath -w`.
+
+    Args:
+        archive_path (Path): Ruta del archivo comprimido (.rar, .zip, etc.).
+        dest_dir (Path): Directorio donde se almacenarán los archivos extraídos.
+        tool_bin (str): Ruta del ejecutable de descompresión.
+
+    Returns:
+        bool: True si la descompresión fue exitosa (código 0), False en caso de error.
+    """
     dest_dir.mkdir(parents=True, exist_ok=True)
-    
-    # Si estamos invocando un binario de Windows (.exe) desde WSL, convertimos las rutas con wslpath
     is_windows_exe = tool_bin.endswith(".exe")
     
     if is_windows_exe:
@@ -51,10 +97,29 @@ def run_extraction(archive_path: Path, dest_dir: Path, tool_bin: str) -> bool:
     return result.returncode == 0
 
 def extract_year_archives(years: List[int] = [2023, 2024, 2025]) -> List[Path]:
-    """Extrae recursivamente los archivos de los años seleccionados."""
+    """
+    Procesa recursivamente los archivos comprimidos correspondientes a los años especificados.
+
+    Flujo de ejecución:
+    1. Descomprime el archivo .rar principal de cada año en `data/staging/simce/<año>/`.
+    2. Identifica los archivos .rar internos por cada grado escolar y los descomprime.
+    3. Descubre y retorna la lista de todos los archivos .csv extraídos y listos para normalizar.
+
+    Args:
+        years (List[int]): Lista de años a descomprimir (ej: [2023, 2024, 2025]).
+
+    Returns:
+        List[Path]: Lista de rutas hacia los archivos CSV encontrados.
+
+    Raises:
+        RuntimeError: Si no se encuentra instalado 7-Zip o unrar en el sistema.
+    """
     tool_bin = find_7z_binary()
     if not tool_bin:
-        raise RuntimeError("No se encontró 7-Zip ni unrar para descomprimir los archivos .rar")
+        raise RuntimeError(
+            "No se encontró 7-Zip ni unrar para descomprimir los archivos .rar. "
+            "Asegúrate de tener 7-Zip instalado en tu equipo."
+        )
 
     extracted_csvs: List[Path] = []
     
@@ -64,7 +129,7 @@ def extract_year_archives(years: List[int] = [2023, 2024, 2025]) -> List[Path]:
     for year in years:
         year_staging = STAGING_DIR / str(year)
         
-        # Buscar el archivo del año
+        # Buscar el archivo del año en data/raw/simce/
         candidates = list(RAW_DIR.glob(f"*{year}*.rar"))
         if not candidates:
             print(f"[!] No se encontró archivo .rar para el año {year}")
@@ -74,13 +139,13 @@ def extract_year_archives(years: List[int] = [2023, 2024, 2025]) -> List[Path]:
         print(f"\n--- Descomprimiendo contenedor principal {year}: {outer_rar.name} ---")
         run_extraction(outer_rar, year_staging, tool_bin)
         
-        # Buscar archivos .rar anidados (por grado)
+        # Buscar y extraer archivos .rar anidados (por grado escolar)
         inner_rars = list(year_staging.glob("*.rar"))
         for inner_rar in inner_rars:
             print(f"  -> Extrayendo grado: {inner_rar.name}")
             run_extraction(inner_rar, year_staging, tool_bin)
             
-        # Recolectar todos los CSVs generados
+        # Recolectar todos los CSVs generados para este año
         csvs = list(year_staging.rglob("*.csv"))
         print(f"  [OK] Año {year}: {len(csvs)} archivos CSV encontrados.")
         extracted_csvs.extend(csvs)
