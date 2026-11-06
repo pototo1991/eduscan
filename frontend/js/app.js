@@ -1,6 +1,7 @@
 /**
  * EduScan - Lógica de Aplicación Frontend (Vanilla JS)
- * ====================================================
+ * Sistema de Diseño: Clean Daylight & Academic Slate (WCAG AA/AAA)
+ * =================================================================
  */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -195,7 +196,7 @@ document.addEventListener('DOMContentLoaded', () => {
     dom.schoolsGrid.innerHTML = `
       <div class="loading-spinner" style="grid-column: 1 / -1;">
         <div class="spinner"></div>
-        <span>Buscando colegios...</span>
+        <span>Buscando establecimientos...</span>
       </div>
     `;
 
@@ -240,7 +241,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function renderSchools(schools) {
     if (!schools || schools.length === 0) {
-      dom.resultsCountText.innerHTML = `No se encontraron colegios coincidentes.`;
+      dom.resultsCountText.innerHTML = `No se encontraron establecimientos coincidentes.`;
       dom.schoolsGrid.innerHTML = `
         <div class="empty-state" style="grid-column: 1 / -1;">
           <h3>Sin resultados</h3>
@@ -262,19 +263,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
       let scoresHtml = '';
       if (ev && (ev.puntaje_lectura || ev.puntaje_matematica)) {
-        // Cálculo de diferencia con la comuna
+        // Cálculo de diferencia con la comuna (con íconos ▲ ▼ para accesibilidad)
         let difLectHtml = '';
         if (ev.puntaje_lectura && ev.comuna_promedio_lectura) {
           const dif = Math.round(ev.puntaje_lectura - ev.comuna_promedio_lectura);
           const cls = dif >= 0 ? 'diff-positive' : 'diff-negative';
-          difLectHtml = `<span class="diff-badge ${cls}">${dif >= 0 ? '+' : ''}${dif} com.</span>`;
+          const icon = dif >= 0 ? '▲ +' : '▼ ';
+          difLectHtml = `<span class="diff-badge ${cls}">${icon}${Math.abs(dif)} com.</span>`;
         }
 
         let difMateHtml = '';
         if (ev.puntaje_matematica && ev.comuna_promedio_matematica) {
           const dif = Math.round(ev.puntaje_matematica - ev.comuna_promedio_matematica);
           const cls = dif >= 0 ? 'diff-positive' : 'diff-negative';
-          difMateHtml = `<span class="diff-badge ${cls}">${dif >= 0 ? '+' : ''}${dif} com.</span>`;
+          const icon = dif >= 0 ? '▲ +' : '▼ ';
+          difMateHtml = `<span class="diff-badge ${cls}">${icon}${Math.abs(dif)} com.</span>`;
         }
 
         scoresHtml = `
@@ -303,7 +306,7 @@ document.addEventListener('DOMContentLoaded', () => {
         `;
       }
 
-      const card = document.createElement('div');
+      const card = document.createElement('article');
       card.className = 'school-card';
       card.innerHTML = `
         <div class="card-top">
@@ -325,7 +328,7 @@ document.addEventListener('DOMContentLoaded', () => {
           ${scoresHtml}
           <div class="card-actions">
             <button class="btn-card-detail" data-rbd="${school.rbd}">Ver Ficha Escolar</button>
-            <button class="btn-card-compare ${isCompared ? 'active' : ''}" data-rbd="${school.rbd}" title="Comparar este colegio">
+            <button class="btn-card-compare ${isCompared ? 'active' : ''}" data-rbd="${school.rbd}" aria-label="Comparar este colegio">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/>
               </svg>
@@ -334,7 +337,6 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
       `;
 
-      // Eventos de botones de la tarjeta
       card.querySelector('.btn-card-detail').addEventListener('click', () => openDetailModal(school.rbd));
       const btnComp = card.querySelector('.btn-card-compare');
       btnComp.addEventListener('click', () => toggleCompare(school.rbd, btnComp));
@@ -359,17 +361,17 @@ document.addEventListener('DOMContentLoaded', () => {
     if (state.page > 1) {
       state.page--;
       searchSchools();
-      window.scrollTo({ top: 350, behavior: 'smooth' });
+      window.scrollTo({ top: 320, behavior: 'smooth' });
     }
   });
 
   dom.btnNextPage.addEventListener('click', () => {
     state.page++;
     searchSchools();
-    window.scrollTo({ top: 350, behavior: 'smooth' });
+    window.scrollTo({ top: 320, behavior: 'smooth' });
   });
 
-  // 4. Comparador y Dock Flotante
+  // 4. Comparador y Dock Flotante (Contraste Invertido #1e293b)
   function toggleCompare(rbd, btnElement) {
     const idx = state.comparedRBDs.indexOf(rbd);
     if (idx > -1) {
@@ -415,10 +417,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
   dom.btnLaunchCompare.addEventListener('click', openComparatorModal);
 
-  // 5. Modal de Detalle (Ficha Escolar Inteligente)
+  // 5. Modal de Detalle (Ficha Escolar)
   async function openDetailModal(rbd) {
     dom.modalSchoolName.textContent = 'Cargando información...';
-    dom.modalOverlay = dom.modalDetail;
     dom.modalDetail.classList.add('active');
 
     try {
@@ -440,7 +441,6 @@ document.addEventListener('DOMContentLoaded', () => {
     dom.modalDepBadge.className = `dep-badge ${getDependenciaClass(est.dependencia)}`;
     dom.modalSchoolLocation.textContent = `${est.comuna}, ${est.provincia}, ${est.region}`;
 
-    // Buscar la evaluación del grado y año activos (o la más reciente)
     const activeEval = data.historial_simce.find(e => e.anio === state.anio && e.grado === state.grado) 
                       || data.historial_simce[data.historial_simce.length - 1];
 
@@ -449,22 +449,22 @@ document.addEventListener('DOMContentLoaded', () => {
       dom.kpiMatematica.textContent = activeEval.puntaje_matematica ? Math.round(activeEval.puntaje_matematica) : 'S/I';
       dom.kpiNse.textContent = activeEval.grupo_nse ? `Grupo ${activeEval.grupo_nse}` : 'No clasificado';
 
-      // Benchmark comunal
       const comBench = data.benchmarks_comunales.find(c => c.anio === activeEval.anio && c.grado === activeEval.grado);
       if (comBench) {
         if (activeEval.puntaje_lectura && comBench.promedio_lectura) {
           const dif = Math.round(activeEval.puntaje_lectura - comBench.promedio_lectura);
-          dom.kpiSubLectura.textContent = `${dif >= 0 ? '+' : ''}${dif} pts vs comuna (${Math.round(comBench.promedio_lectura)})`;
-          dom.kpiSubLectura.style.color = dif >= 0 ? 'var(--accent-emerald)' : 'var(--accent-rose)';
+          const icon = dif >= 0 ? '▲ +' : '▼ ';
+          dom.kpiSubLectura.textContent = `${icon}${Math.abs(dif)} pts vs comuna (${Math.round(comBench.promedio_lectura)})`;
+          dom.kpiSubLectura.style.color = dif >= 0 ? 'var(--eda-adecuado-text)' : 'var(--eda-insuf-text)';
         }
         if (activeEval.puntaje_matematica && comBench.promedio_matematica) {
           const dif = Math.round(activeEval.puntaje_matematica - comBench.promedio_matematica);
-          dom.kpiSubMatematica.textContent = `${dif >= 0 ? '+' : ''}${dif} pts vs comuna (${Math.round(comBench.promedio_matematica)})`;
-          dom.kpiSubMatematica.style.color = dif >= 0 ? 'var(--accent-emerald)' : 'var(--accent-rose)';
+          const icon = dif >= 0 ? '▲ +' : '▼ ';
+          dom.kpiSubMatematica.textContent = `${icon}${Math.abs(dif)} pts vs comuna (${Math.round(comBench.promedio_matematica)})`;
+          dom.kpiSubMatematica.style.color = dif >= 0 ? 'var(--eda-adecuado-text)' : 'var(--eda-insuf-text)';
         }
       }
 
-      // Estándares de Aprendizaje (EDA)
       renderEdaBars(activeEval);
     } else {
       dom.kpiLectura.textContent = 'S/I';
@@ -472,27 +472,24 @@ document.addEventListener('DOMContentLoaded', () => {
       dom.kpiNse.textContent = '-';
     }
 
-    // Gráfico de Evolución Histórica
     renderHistoricalChart(data.historial_simce, data.benchmarks_comunales);
   }
 
   function renderEdaBars(evalObj) {
-    // Lectura
     const insL = evalObj.pct_insuficiente_lectura || 0;
     const eleL = evalObj.pct_elemental_lectura || 0;
     const adeL = evalObj.pct_adecuado_lectura || 0;
-    dom.edaLecturaPct.textContent = `${adeL}% Adecuado / ${eleL}% Elemental / ${insL}% Insuf.`;
+    dom.edaLecturaPct.textContent = `${adeL}% Adecuado / ${eleL}% Elemental / ${insL}% Insuficiente`;
     dom.edaBarLectura.innerHTML = `
       <div class="bar-ins" style="width: ${insL}%" title="Insuficiente: ${insL}%"></div>
       <div class="bar-ele" style="width: ${eleL}%" title="Elemental: ${eleL}%"></div>
       <div class="bar-ade" style="width: ${adeL}%" title="Adecuado: ${adeL}%"></div>
     `;
 
-    // Matemática
     const insM = evalObj.pct_insuficiente_matematica || 0;
     const eleM = evalObj.pct_elemental_matematica || 0;
     const adeM = evalObj.pct_adecuado_matematica || 0;
-    dom.edaMatePct.textContent = `${adeM}% Adecuado / ${eleM}% Elemental / ${insM}% Insuf.`;
+    dom.edaMatePct.textContent = `${adeM}% Adecuado / ${eleM}% Elemental / ${insM}% Insuficiente`;
     dom.edaBarMatematica.innerHTML = `
       <div class="bar-ins" style="width: ${insM}%" title="Insuficiente: ${insM}%"></div>
       <div class="bar-ele" style="width: ${eleM}%" title="Elemental: ${eleM}%"></div>
@@ -500,18 +497,17 @@ document.addEventListener('DOMContentLoaded', () => {
     `;
   }
 
+  // Gráficos Chart.js adaptados a Clean Daylight (Fondo blanco, gridlines claras, spanGaps)
   function renderHistoricalChart(evals, comunales) {
     if (state.chartHistoricoInstance) {
       state.chartHistoricoInstance.destroy();
     }
 
-    // Filtrar evaluaciones por el grado seleccionado para que la serie sea coherente
     const evalsGrado = evals.filter(e => e.grado === state.grado);
     const labels = evalsGrado.map(e => `${e.anio} (${e.grado.toUpperCase()})`);
     const dataLectura = evalsGrado.map(e => e.puntaje_lectura);
     const dataMate = evalsGrado.map(e => e.puntaje_matematica);
 
-    // Mapear promedio comunal para esos mismos años
     const dataComunaMate = evalsGrado.map(e => {
       const match = comunales.find(c => c.anio === e.anio && c.grado === e.grado);
       return match ? match.promedio_matematica : null;
@@ -525,31 +521,37 @@ document.addEventListener('DOMContentLoaded', () => {
           {
             label: 'Matemática (Colegio)',
             data: dataMate,
-            borderColor: '#6366f1',
-            backgroundColor: 'rgba(99, 102, 241, 0.1)',
-            borderWidth: 3,
-            tension: 0.3,
+            borderColor: '#4f46e5', // Índigo Institucional
+            backgroundColor: 'rgba(79, 70, 229, 0.08)',
+            borderWidth: 2.5,
+            tension: 0.2,
             pointRadius: 5,
-            fill: true
+            pointBackgroundColor: '#4f46e5',
+            fill: true,
+            spanGaps: true
           },
           {
             label: 'Lectura (Colegio)',
             data: dataLectura,
-            borderColor: '#06b6d4',
-            backgroundColor: 'rgba(6, 182, 212, 0.1)',
-            borderWidth: 3,
-            tension: 0.3,
+            borderColor: '#0284c7', // Azul Cerúleo
+            backgroundColor: 'rgba(2, 132, 199, 0.08)',
+            borderWidth: 2.5,
+            tension: 0.2,
             pointRadius: 5,
-            fill: true
+            pointBackgroundColor: '#0284c7',
+            fill: true,
+            spanGaps: true
           },
           {
-            label: 'Promedio Comuna (Matemática)',
+            label: 'Promedio Comunal (Matemática)',
             data: dataComunaMate,
-            borderColor: '#64748b',
+            borderColor: '#64748b', // Slate 500
             borderWidth: 2,
-            borderDash: [5, 5],
+            borderDash: [6, 4],
             pointRadius: 3,
-            fill: false
+            pointBackgroundColor: '#64748b',
+            fill: false,
+            spanGaps: true
           }
         ]
       },
@@ -557,19 +559,38 @@ document.addEventListener('DOMContentLoaded', () => {
         responsive: true,
         plugins: {
           legend: {
-            labels: { color: '#94a3b8', font: { family: 'Inter' } }
+            labels: { 
+              color: '#334155', 
+              font: { family: 'Inter', size: 13, weight: '600' } 
+            }
+          },
+          tooltip: {
+            backgroundColor: '#ffffff',
+            titleColor: '#0f172a',
+            bodyColor: '#334155',
+            borderColor: '#cbd5e1',
+            borderWidth: 1,
+            padding: 10,
+            boxPadding: 4,
+            usePointStyle: true
           }
         },
         scales: {
           y: {
-            grid: { color: 'rgba(255, 255, 255, 0.05)' },
-            ticks: { color: '#94a3b8' },
-            suggestedMin: 180,
+            grid: { color: '#f1f5f9' },
+            ticks: { 
+              color: '#475569',
+              font: { family: 'Inter', size: 13 }
+            },
+            suggestedMin: 190,
             suggestedMax: 330
           },
           x: {
-            grid: { color: 'rgba(255, 255, 255, 0.05)' },
-            ticks: { color: '#94a3b8' }
+            grid: { color: '#f8fafc' },
+            ticks: { 
+              color: '#475569',
+              font: { family: 'Inter', size: 13, weight: '600' }
+            }
           }
         }
       }
@@ -598,7 +619,6 @@ document.addEventListener('DOMContentLoaded', () => {
   function renderComparatorModal(colegios) {
     if (!colegios || colegios.length === 0) return;
 
-    // 1. Armar Tabla Comparativa
     dom.compareTableHead.innerHTML = '<th>Indicador</th>' + colegios.map(c => `<th>${c.nombre}</th>`).join('');
 
     const rows = [
@@ -607,10 +627,12 @@ document.addEventListener('DOMContentLoaded', () => {
       { label: 'Comuna', fn: c => c.nom_comuna },
       { label: 'Puntaje Lectura', fn: c => c.puntaje_lectura ? `<strong>${Math.round(c.puntaje_lectura)}</strong> pts` : 'S/I' },
       { label: 'Puntaje Matemática', fn: c => c.puntaje_matematica ? `<strong>${Math.round(c.puntaje_matematica)}</strong> pts` : 'S/I' },
-      { label: 'Vs Promedio Comuna (Mate)', fn: c => {
+      { label: 'Vs Promedio Comunal (Mate)', fn: c => {
         if (!c.puntaje_matematica || !c.comuna_matematica) return '-';
         const d = Math.round(c.puntaje_matematica - c.comuna_matematica);
-        return `<span class="diff-badge ${d >= 0 ? 'diff-positive' : 'diff-negative'}">${d >= 0 ? '+' : ''}${d} pts</span>`;
+        const cls = d >= 0 ? 'diff-positive' : 'diff-negative';
+        const icon = d >= 0 ? '▲ +' : '▼ ';
+        return `<span class="diff-badge ${cls}">${icon}${Math.abs(d)} pts</span>`;
       }},
       { label: '% Nivel Adecuado (Mate)', fn: c => c.pct_adecuado_matematica ? `${c.pct_adecuado_matematica}%` : '-' }
     ];
@@ -622,12 +644,11 @@ document.addEventListener('DOMContentLoaded', () => {
       </tr>
     `).join('');
 
-    // 2. Gráfico de Barras Agrupadas
     if (state.chartComparatorInstance) {
       state.chartComparatorInstance.destroy();
     }
 
-    const schoolLabels = colegios.map(c => c.nombre.length > 20 ? c.nombre.substring(0, 18) + '...' : c.nombre);
+    const schoolLabels = colegios.map(c => c.nombre.length > 22 ? c.nombre.substring(0, 20) + '...' : c.nombre);
     const mateScores = colegios.map(c => c.puntaje_matematica || 0);
     const lectScores = colegios.map(c => c.puntaje_lectura || 0);
 
@@ -639,13 +660,13 @@ document.addEventListener('DOMContentLoaded', () => {
           {
             label: 'Matemática',
             data: mateScores,
-            backgroundColor: '#6366f1',
+            backgroundColor: '#4f46e5', // Índigo
             borderRadius: 6
           },
           {
             label: 'Lectura',
             data: lectScores,
-            backgroundColor: '#06b6d4',
+            backgroundColor: '#0284c7', // Azul Cerúleo
             borderRadius: 6
           }
         ]
@@ -653,18 +674,27 @@ document.addEventListener('DOMContentLoaded', () => {
       options: {
         responsive: true,
         plugins: {
-          legend: { labels: { color: '#94a3b8' } }
+          legend: { 
+            labels: { color: '#334155', font: { family: 'Inter', size: 13, weight: '600' } } 
+          },
+          tooltip: {
+            backgroundColor: '#ffffff',
+            titleColor: '#0f172a',
+            bodyColor: '#334155',
+            borderColor: '#cbd5e1',
+            borderWidth: 1
+          }
         },
         scales: {
           y: {
-            grid: { color: 'rgba(255, 255, 255, 0.05)' },
-            ticks: { color: '#94a3b8' },
+            grid: { color: '#f1f5f9' },
+            ticks: { color: '#475569', font: { family: 'Inter', size: 13 } },
             suggestedMin: 180,
-            suggestedMax: 350
+            suggestedMax: 340
           },
           x: {
             grid: { display: false },
-            ticks: { color: '#fff', font: { weight: 600 } }
+            ticks: { color: '#0f172a', font: { family: 'Inter', size: 12, weight: '600' } }
           }
         }
       }
@@ -675,7 +705,6 @@ document.addEventListener('DOMContentLoaded', () => {
     dom.modalComparator.classList.remove('active');
   });
 
-  // Cerrar modales con Escape o clic fuera
   window.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
       dom.modalDetail.classList.remove('active');
