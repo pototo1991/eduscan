@@ -1,0 +1,14 @@
+# Datos crudos y descargas masivas (evitar subir al repositorio)
+data/raw/
+data/staging/
+*.rar
+*.zip
+*.csv
+*.dta
+*.xlsx
+
+# Entorno y credenciales
+.env
+__pycache__/
+*.pyc
+.venv/
