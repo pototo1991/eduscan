@@ -166,11 +166,11 @@ def parse_comuna_file(file_path: Path) -> pd.DataFrame:
         
     comuna_data = []
     for _, row in df_raw.iterrows():
-        cod_com = clean_int(row.get("cod_com_rbd", row.get("cod_comuna")))
+        cod_com = clean_int(row.get("cod_com", row.get("cod_com_rbd", row.get("cod_comuna"))))
         if not cod_com:
             continue
             
-        nom_com = str(row.get("nom_com_rbd", row.get("nom_comuna", ""))).strip().title()
+        nom_com = str(row.get("nom_com", row.get("nom_com_rbd", row.get("nom_comuna", "")))).strip().title()
         p_lect = clean_numeric(row.get(f"prom_lect{grado}_com", row.get(f"prom_lect{grado}_rbd", row.get("prom_lect_com"))))
         p_mate = clean_numeric(row.get(f"prom_mate{grado}_com", row.get(f"prom_mate{grado}_rbd", row.get("prom_mate_com"))))
         p_cien = clean_numeric(row.get(f"prom_csnat{grado}_com", row.get(f"prom_cien{grado}_com")))
@@ -208,11 +208,11 @@ def parse_region_file(file_path: Path) -> pd.DataFrame:
         
     reg_data = []
     for _, row in df_raw.iterrows():
-        cod_reg = clean_int(row.get("cod_reg_rbd", row.get("cod_region")))
+        cod_reg = clean_int(row.get("cod_reg", row.get("cod_reg_rbd", row.get("cod_region"))))
         if not cod_reg:
             continue
             
-        nom_reg = str(row.get("nom_reg_rbd", row.get("nom_region", ""))).strip().title()
+        nom_reg = str(row.get("nom_reg", row.get("nom_reg_rbd", row.get("nom_region", "")))).strip().title()
         p_lect = clean_numeric(row.get(f"prom_lect{grado}_reg", row.get(f"prom_lect{grado}_rbd", row.get("prom_lect_reg"))))
         p_mate = clean_numeric(row.get(f"prom_mate{grado}_reg", row.get(f"prom_mate{grado}_rbd", row.get("prom_mate_reg"))))
         p_cien = clean_numeric(row.get(f"prom_csnat{grado}_reg", row.get(f"prom_cien{grado}_reg")))

@@ -1,11 +1,15 @@
 import sys
 from pathlib import Path
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+if str(BASE_DIR) not in sys.path:
+    sys.path.insert(0, str(BASE_DIR))
+
 import pandas as pd
 from sqlalchemy import create_engine, text
 from etl.config import get_database_url
 from etl.normalizador import parse_rbd_file, parse_comuna_file, parse_region_file
 
-BASE_DIR = Path(__file__).resolve().parent.parent
 STAGING_DIR = BASE_DIR / "data" / "staging" / "simce"
 INIT_SQL_PATH = BASE_DIR / "deploy" / "knossos" / "init_db.sql"
 
@@ -27,10 +31,30 @@ def init_schema(engine):
                 conn.execute(text(stmt))
     print("[OK] Tablas e índices inicializados correctamente.")
 
+import math
+
+def clean_records(records, int_keys=None):
+    """Reemplaza NaN de float por None y asegura tipos enteros correctos."""
+    int_keys = set(int_keys or [])
+    for r in records:
+        for k, v in r.items():
+            if v is not None and isinstance(v, float) and math.isnan(v):
+                r[k] = None
+            elif k in int_keys and v is not None:
+                try:
+                    r[k] = int(v)
+                except (ValueError, TypeError):
+                    r[k] = None
+    return records
+
 def upsert_establecimientos(engine, df_est: pd.DataFrame):
     if df_est.empty:
         return 0
-    records = df_est.to_dict(orient="records")
+    raw_records = df_est.to_dict(orient="records")
+    records = clean_records(raw_records, [
+        "rbd", "cod_region", "cod_provincia", "cod_comuna",
+        "cod_deprov", "cod_depe1", "cod_depe2", "cod_rural"
+    ])
     sql = text("""
         INSERT INTO establecimiento (
             rbd, dv_rbd, nombre, cod_region, nom_region, cod_provincia, nom_provincia,
@@ -57,7 +81,8 @@ def upsert_establecimientos(engine, df_est: pd.DataFrame):
 def upsert_evaluaciones(engine, df_eval: pd.DataFrame):
     if df_eval.empty:
         return 0
-    records = df_eval.to_dict(orient="records")
+    raw_records = df_eval.to_dict(orient="records")
+    records = clean_records(raw_records, ["rbd", "anio", "alumnos_lectura", "alumnos_matematica"])
     sql = text("""
         INSERT INTO evaluacion_simce (
             rbd, anio, grado, grupo_nse, alumnos_lectura, alumnos_matematica,
@@ -92,7 +117,8 @@ def upsert_evaluaciones(engine, df_eval: pd.DataFrame):
 def upsert_comunales(engine, df_com: pd.DataFrame):
     if df_com.empty:
         return 0
-    records = df_com.to_dict(orient="records")
+    raw_records = df_com.to_dict(orient="records")
+    records = clean_records(raw_records, ["cod_comuna", "anio"])
     sql = text("""
         INSERT INTO promedio_comunal_simce (
             cod_comuna, nom_comuna, anio, grado, promedio_lectura, promedio_matematica,
@@ -114,7 +140,8 @@ def upsert_comunales(engine, df_com: pd.DataFrame):
 def upsert_regionales(engine, df_reg: pd.DataFrame):
     if df_reg.empty:
         return 0
-    records = df_reg.to_dict(orient="records")
+    raw_records = df_reg.to_dict(orient="records")
+    records = clean_records(raw_records, ["cod_region", "anio"])
     sql = text("""
         INSERT INTO promedio_regional_simce (
             cod_region, nom_region, anio, grado, promedio_lectura, promedio_matematica,
