@@ -10,8 +10,8 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-eduscan_user}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Debes definir POSTGRES_PASSWORD en tu .env}
     ports:
-      # Expone el puerto 5432 para que tu equipo local pueda conectarse
-      - "5432:5432"
+      # Puerto externo en knossos (5433 para no colisionar si 5432 ya está ocupado)
+      - "${DB_PORT:-5433}:5432"
     volumes:
       - eduscan_pgdata:/var/lib/postgresql/data
       - ./init_db.sql:/docker-entrypoint-initdb.d/init_db.sql:ro
