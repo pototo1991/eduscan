@@ -1,0 +1,19 @@
+services:
+  eduscan-web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: eduscan_web
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    volumes:
+      # Montaje para desarrollo con recarga en caliente
+      - ./backend:/app/backend
+      - ./frontend:/app/frontend
+      - ./etl:/app/etl
+    environment:
+      - PYTHONUNBUFFERED=1
+    command: uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
