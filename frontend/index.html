@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EduScan - Plataforma de Inteligencia y Análisis Escolar</title>
+  <meta name="description" content="Visualiza, filtra y compara resultados oficiales del SIMCE y el sistema educacional chileno de forma clara y accesible.">
+  
+  <!-- Google Fonts: Outfit & Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- Chart.js para gráficos interactivos -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <!-- Estilos del Sistema EduScan -->
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+  <!-- Encabezado / Navbar -->
+  <header class="site-header">
+    <div class="container nav-wrapper">
+      <a href="/" class="logo-brand" id="brand-link">
+        <div class="logo-icon">
+          <svg viewBox="0 0 24 24">
+            <path d="M12 3L1 9L12 15L21 10.09V17H23V9M5 13.18V17.18L12 21L19 17.18V13.18L12 17L5 13.18Z"/>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <h1>EduScan</h1>
+          <span class="brand-tag">Datos Abiertos Chile</span>
+        </div>
+      </a>
+
+      <div class="nav-actions">
+        <button class="btn-compare-dock" id="btn-open-compare-nav">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/>
+          </svg>
+          Comparador
+          <span class="badge-count" id="nav-compare-count">0</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+    <!-- Hero & Estadísticas Rápidas -->
+    <section class="hero-section">
+      <div class="hero-pill">
+        <span class="dot"></span>
+        <span>Datos oficiales SIMCE actualizados a 2025</span>
+      </div>
+      <h2 class="hero-title">Decisiones informadas sobre la <span>educación de tus hijos</span></h2>
+      <p class="hero-subtitle">
+        Explora más de 8.000 colegios de Chile, compara puntajes históricos, evalúa estándares de aprendizaje y contrasta con los promedios de tu comuna.
+      </p>
+
+      <div class="stats-banner" id="stats-banner">
+        <div class="stat-item">
+          <span class="stat-num" id="stat-colegios">-</span>
+          <span class="stat-label">Colegios Evaluados</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-num" id="stat-evaluaciones">-</span>
+          <span class="stat-label">Evaluaciones SIMCE</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-num" id="stat-comunas">-</span>
+          <span class="stat-label">Comunas en Chile</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Buscador y Filtros -->
+    <section class="search-container">
+      <div class="search-input-box">
+        <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="8"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+        <input 
+          type="text" 
+          id="search-input" 
+          class="search-input" 
+          placeholder="Busca por nombre de colegio o código RBD (ej: Instituto Nacional o 14324)..."
+          autocomplete="off"
+        >
+        <button class="btn-search" id="btn-search-trigger">Buscar</button>
+      </div>
+
+      <!-- Barra de Filtros en Cascada -->
+      <div class="filters-toolbar">
+        <div class="filter-group">
+          <label class="filter-label" for="filter-region">Región</label>
+          <select id="filter-region" class="select-custom">
+            <option value="todas">Todas las regiones</option>
+          </select>
+        </div>
+
+        <div class="filter-group">
+          <label class="filter-label" for="filter-comuna">Comuna</label>
+          <select id="filter-comuna" class="select-custom">
+            <option value="todas">Todas las comunas</option>
+          </select>
+        </div>
+
+        <div class="filter-group">
+          <label class="filter-label" for="filter-dependencia">Dependencia</label>
+          <select id="filter-dependencia" class="select-custom">
+            <option value="todas">Todas las dependencias</option>
+          </select>
+        </div>
+
+        <div class="filter-group">
+          <label class="filter-label" for="filter-grado">Nivel / Grado</label>
+          <select id="filter-grado" class="select-custom">
+            <option value="4b" selected>4° Básico</option>
+            <option value="6b">6° Básico</option>
+            <option value="8b">8° Básico</option>
+            <option value="2m">II° Medio</option>
+          </select>
+        </div>
+
+        <div class="filter-group">
+          <label class="filter-label" for="filter-anio">Año SIMCE</label>
+          <select id="filter-anio" class="select-custom">
+            <option value="2024" selected>2024</option>
+            <option value="2025">2025</option>
+            <option value="2023">2023</option>
+          </select>
+        </div>
+      </div>
+    </section>
+
+    <!-- Encabezado de Resultados -->
+    <div class="results-header">
+      <div class="results-count" id="results-count-text">
+        Mostrando colegios...
+      </div>
+    </div>
+
+    <!-- Contenedor de Tarjetas de Colegios -->
+    <div class="schools-grid" id="schools-grid">
+      <!-- Se inyecta dinámicamente vía app.js -->
+    </div>
+
+    <!-- Paginación -->
+    <div class="pagination-wrapper" id="pagination-wrapper" style="display: none;">
+      <button class="btn-page" id="btn-prev-page" disabled>&larr; Anterior</button>
+      <span class="page-indicator" id="page-indicator">Página 1</span>
+      <button class="btn-page" id="btn-next-page">Siguiente &rarr;</button>
+    </div>
+  </main>
+
+  <!-- Dock Flotante de Comparación (Aparece abajo al seleccionar 1+ colegios) -->
+  <div class="compare-dock" id="compare-dock">
+    <div class="dock-info">
+      <span>Comparar:</span>
+      <span class="badge-count" id="dock-compare-count">0</span>
+      <span>de 3 colegios seleccionados</span>
+    </div>
+    <button class="btn-trigger-compare" id="btn-launch-compare">Comparar Ahora</button>
+    <button class="btn-clear-dock" id="btn-clear-compare">Limpiar</button>
+  </div>
+
+  <!-- Modal 1: Ficha Escolar Inteligente (Detalle de Colegio) -->
+  <div class="modal-overlay" id="modal-school-detail">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div>
+          <div class="badge-row" style="margin-bottom: 8px;">
+            <span class="dep-badge" id="modal-dep-badge">Municipal</span>
+            <span class="rbd-chip" id="modal-rbd-chip">RBD: -</span>
+          </div>
+          <h2 class="card-title" id="modal-school-name" style="font-size: 1.5rem;">Cargando...</h2>
+          <div class="card-location" id="modal-school-location">-</div>
+        </div>
+        <button class="btn-close-modal" id="btn-close-detail">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <!-- KPIs Principales del año seleccionado -->
+        <div class="detail-kpi-grid">
+          <div class="kpi-card">
+            <div class="kpi-label">Puntaje Lectura</div>
+            <div class="kpi-value" id="kpi-lectura">-</div>
+            <div class="kpi-sub" id="kpi-sub-lectura">vs Promedio Comunal</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">Puntaje Matemática</div>
+            <div class="kpi-value" id="kpi-matematica">-</div>
+            <div class="kpi-sub" id="kpi-sub-matematica">vs Promedio Comunal</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">Grupo Socioeconómico</div>
+            <div class="kpi-value" id="kpi-nse">-</div>
+            <div class="kpi-sub">Clasificación Agencia</div>
+          </div>
+        </div>
+
+        <!-- Gráfico de Evolución Histórica SIMCE -->
+        <div class="chart-container-box">
+          <h3 class="chart-title">Evolución Histórica de Puntajes</h3>
+          <canvas id="chart-historico" height="90"></canvas>
+        </div>
+
+        <!-- Estándares de Aprendizaje (EDA) -->
+        <div class="chart-container-box">
+          <h3 class="chart-title">Estándares de Aprendizaje (% de Alumnos)</h3>
+          
+          <div class="eda-bar-wrapper">
+            <div class="eda-bar-labels">
+              <span>Lectura</span>
+              <span id="eda-lectura-pct">-</span>
+            </div>
+            <div class="eda-stacked-bar" id="eda-bar-lectura">
+              <div class="bar-ins" style="width: 30%"></div>
+              <div class="bar-ele" style="width: 40%"></div>
+              <div class="bar-ade" style="width: 30%"></div>
+            </div>
+          </div>
+
+          <div class="eda-bar-wrapper" style="margin-top: 16px;">
+            <div class="eda-bar-labels">
+              <span>Matemática</span>
+              <span id="eda-mate-pct">-</span>
+            </div>
+            <div class="eda-stacked-bar" id="eda-bar-matematica">
+              <div class="bar-ins" style="width: 25%"></div>
+              <div class="bar-ele" style="width: 45%"></div>
+              <div class="bar-ade" style="width: 30%"></div>
+            </div>
+          </div>
+
+          <div class="eda-legend">
+            <div class="legend-item"><span class="legend-dot" style="background: var(--accent-emerald);"></span> Adecuado</div>
+            <div class="legend-item"><span class="legend-dot" style="background: var(--accent-amber);"></span> Elemental</div>
+            <div class="legend-item"><span class="legend-dot" style="background: var(--accent-rose);"></span> Insuficiente</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 2: Comparador Lado a Lado -->
+  <div class="modal-overlay" id="modal-comparator">
+    <div class="modal-content" style="max-width: 1000px;">
+      <div class="modal-header">
+        <div>
+          <h2 class="card-title" style="font-size: 1.5rem;">Comparativa de Establecimientos</h2>
+          <p style="color: var(--text-muted); font-size: 0.88rem;">Contraste directo de puntajes y niveles de desempeño escolar</p>
+        </div>
+        <button class="btn-close-modal" id="btn-close-compare">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="chart-container-box">
+          <h3 class="chart-title">Comparativa de Puntajes SIMCE</h3>
+          <canvas id="chart-comparator" height="100"></canvas>
+        </div>
+
+        <div style="overflow-x: auto;">
+          <table class="compare-table" id="compare-table">
+            <thead>
+              <tr id="compare-table-head">
+                <th>Indicador</th>
+                <!-- Columnas de colegios inyectadas dinámicamente -->
+              </tr>
+            </thead>
+            <tbody id="compare-table-body">
+              <!-- Filas inyectadas dinámicamente -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Lógica de la Aplicación -->
+  <script src="/js/app.js"></script>
+</body>
+</html>
